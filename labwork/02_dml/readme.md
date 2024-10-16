@@ -44,8 +44,6 @@ where c.id not in (select c.id from client c limit((select count(*) from client)
 
 ### 5. Предикат `exists`
 
-`select 1` используется для проверки наличия строк, подходящих под условие
-
 > Получить идентификаторы и имена резидентов сети, у которых НЕ было проведено ни одной тренировки
 ```sql
 select c.id, c.name from client c
@@ -54,7 +52,7 @@ where not exists (
 	where ct.id_client = c.id
 );
 ```
-
+**Примечание:**
 `select 1` используется для проверки наличия строк, подходящих под условие
 
 
@@ -67,7 +65,7 @@ from client c
 join trainer t on t.id_origin = c.id
 where t.price_per_hour >= all (select price_per_hour from trainer) limit 1;
 ```
-
+**Алгоритм:**
 1. Объединяем таблицы клиентов и тренеров внутренне, получаем информацию только тренерах
 2. Получем тренера, почасовая ставка которого `>=` ставок всех остальных тренеров
 
@@ -85,7 +83,7 @@ select count(distinct ct.id_client) as "Number of Clients",
 from client_trainer ct
 join trainer t on ct.id_trainer = t.id_origin;
 ```
-
+**Алгоритм:**
 1. Считаем количество уникальных записей с идентификаторами клиента
 2. Для записей из таблицы тренировок суммируем ставки тренеров, получая выручку
 3. Аналогично п.2 получаем среднюю выручку из рассчета на тренера
@@ -310,7 +308,7 @@ select count(*) from EliteTrainers;
 ```
 
 ### 23. Recursive `CTE`
-> Я устал
+> Рекурсивно генерируем числа от 1 до len(trainer) и конкатинируем id тренеров с этими номерами.
 ```sql
 create temporary table trainer_with_numeration (
     trainer_id uuid primary key,
@@ -339,19 +337,43 @@ order by
 
 select * from trainer_with_numeration;
 ```
-
+---
 ### 24. Оконные функции
-```sql
-select 
 
-    avg(t.price_per_hour) over() as avg_price,
-    min(t.price_per_hour) over() as min_price,
-    max(t.price_per_hour) over() as max_price
-from 
-    trainer t limit 1;
+> **Оконная функция** - функция, работающая с набором строк. Набор строк именуется окном или партицией.
+
+Синтаксис оконной функции:
+```sql
+SELECT
+Название функции (столбец для вычислений) 
+OVER (
+      PARTITION BY столбец для группировки
+      ORDER BY столбец для сортировки
+      ROWS или RANGE выражение для ограничения строк в пределах группы
+      )
 ```
 
-### 25. Устранение дубликатов с помощью `ROW_COUNT()`
+**Пример №24.** Средняя ставка самых дорогих 10-ти тренеров сети.
 ```sql
+select avg(tr.price_per_hour)
+over() 
+from (select price_per_hour from trainer order by price_per_hour desc limit 10) as tr limit 1;
+```
 
+### 25. Очистка от дубликтов с помощью `ROW_NUMBER()`
+1. Создадим локальную таблицу с дубликатами
+```sql
+create temporary table trainer_with_duplicates as
+select 
+    t.id_origin, 
+    t.price_per_hour
+from 
+    trainer t
+
+union all  
+select 
+    t.id_origin, 
+    t.price_per_hour
+from 
+    trainer t;
 ```
