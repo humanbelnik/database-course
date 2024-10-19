@@ -1,23 +1,25 @@
 ### 1. Предикат сравнения
 
-> Вывести id, name клиентов, имеющих хотя бы одну тренировку в залах San Diego
+> Вывести id, name клиентов, имеющих хотя бы однгу тренировку в залах города Tinaberg
+
 ```sql
 select distinct c.id, c.name 
 from client c
-join client_trainer ct on c.id = ct.id_client
-join gym g on ct.id_gym = g.id
-where g.location = 'San Diego';
+join workout w on c.id = w.id_client
+join gym g on w.id_gym = g.id
+where g.location = 'Tinaberg';
 ```
 
 ### 2. Предикат `between`
 
-> Вывести имена тренеров, которые проводили тренировки в период в 01.01.2000 по 01.01.2010. Для каждого тренера вывести даты проведения занятия. Записи отсортировать по возрастанию даты.
+> Вывести имена тренеров, которые провели хотя бы одну тренировку в период с 2000-01-01 и 2010-01-01. Даты тренировок также вывести, а записи отсортировать по их возрастанию.
+
 ```sql
-select c.name, ct.date
+select c.name, w.date
 from client c 
 join trainer t on t.id_origin = c.id
-join client_trainer ct on ct.id_trainer = t.id_origin
-where ct.date between '2000-01-01' and '2010-01-01' order by ct.date
+join workout w on w.id_trainer = t.id_origin
+where w.date between '2000-01-01' and '2010-01-01' order by w.date asc;
 ```
 
 ### 3. Предикат `like`
@@ -27,7 +29,8 @@ where ct.date between '2000-01-01' and '2010-01-01' order by ct.date
 * `%` соответствует любой последовательности сиволов, включая пустую строку.
 * `_` соответствует одному любоум символу.
 
-> Вывести клиентов, имя которых начинается на 'N'
+> Вывести именя клиентов сети, которые начинается на 'N'
+
 ```sql
 select c.name 
 from client c where c.name like 'N%';
@@ -35,7 +38,8 @@ from client c where c.name like 'N%';
 
 ### 4. Предикат `in`
 
-> Получить идентификаторы и имена клиентов последних добавленных 10-ти клиентов
+> Получить id, name последний 10-ти добавленных в базу клиентов
+
 ```sql
 select c.id, c.name
 from client c
@@ -44,12 +48,13 @@ where c.id not in (select c.id from client c limit((select count(*) from client)
 
 ### 5. Предикат `exists`
 
-> Получить идентификаторы и имена резидентов сети, у которых НЕ было проведено ни одной тренировки
+> Получить id, name резидентов сети, у которых НЕ было проведено ни одной тренировки
+
 ```sql
 select c.id, c.name from client c
 where not exists (
-	select 1 from client_trainer ct
-	where ct.id_client = c.id
+	select 1 from workout w
+	where w.id_client = c.id
 );
 ```
 **Примечание:**
@@ -59,12 +64,14 @@ where not exists (
 ### 6. Предикат `all`
 
 > Получить идентификтор, имя и стоимость тренера с самой большой стоимостью тренировочного часа
+
 ```sql
 select c.id, c.name, t.price_per_hour
 from client c 
 join trainer t on t.id_origin = c.id
 where t.price_per_hour >= all (select price_per_hour from trainer) limit 1;
 ```
+
 **Алгоритм:**
 1. Объединяем таблицы клиентов и тренеров внутренне, получаем информацию только тренерах
 2. Получем тренера, почасовая ставка которого `>=` ставок всех остальных тренеров
@@ -73,56 +80,60 @@ where t.price_per_hour >= all (select price_per_hour from trainer) limit 1;
 ### 7. Агрегатные функции по столбцам
 
 Агрегатная функция применяется к множеству значений и возвращает одно значение:
-`AVG()`, `ALL()`, `MIN()`, `MAX()`.
+`AVG()`, `ALL()`, `MIN()`, `MAX()`, `COUNT()`.
 
 > Получить кол-во клиентов, которые хоть раз тренировались, общую выручку и среднюю выручку на тренера
+
 ```sql
-select count(distinct ct.id_client) as "Number of Clients",
+select count(distinct w.id_client) as "Number of Clients",
        sum(t.price_per_hour) as "Total Revenue",
        avg(t.price_per_hour) as "Average Revenue per Trainer"
-from client_trainer ct
-join trainer t on ct.id_trainer = t.id_origin;
+from workout w
+join trainer t on w.id_trainer = t.id_origin;
 ```
+
 **Алгоритм:**
 1. Считаем количество уникальных записей с идентификаторами клиента
 2. Для записей из таблицы тренировок суммируем ставки тренеров, получая выручку
 3. Аналогично п.2 получаем среднюю выручку из рассчета на тренера
+
 
 ### 8. Скаляный подзапрос 
 
 Скалярный подзапрос возвращает одно значение
 
 > Получить суммарное кол-во оборудывания в залах Портланда
+
 ```sql
-select count(*) as "Equipment count in Portland gyms" from equipment as e
+select count(*) as "Equipment count in Tinaberg gyms" from equipment as e
 join gym as g on e.id_gym = g.id
-where g.location = 'Portland';
+where g.location = 'Tinaberg';
 ```
 
-Посчитали сколько записей об оборудывании ссылаются на зал, находящийся в Портланде
 
 ### 9, 10. Оператор `case`
 
 Секции `case` выполняются последовательно и не продолжаются, если текущее условие истино.
 
 > Для каждой тренировки вывсти ее статус
+
 ```sql
-select ct.id_client, ct.id_trainer, ct.date,
+select w.id_client, w.id_trainer, w.date,
 case
-	when ct.date > current_timestamp then 'Upcoming'
-	when ct.date = current_timestamp then 'Ongoing'
+	when w.date > current_timestamp then 'Upcoming'
+	when w.date = current_timestamp then 'Ongoing'
 	else 'Completed'
 end as training_status
-from client_trainer as ct;
+from workout as w;
 ```
 
 > Для каждого клиента получить его категорию в зависимости от стоимости
 ```sql
 select id_origin as trainer_id,
 case 
-	when price_per_hour < 2000 then 'Low Price'
-	when price_per_hour < 5000 then 'Medium Price'
-	when price_per_hour < 10000 then 'High Price'
+	when price_per_hour < 5 then 'Low Price'
+	when price_per_hour < 25 then 'Medium Price'
+	when price_per_hour < 45 then 'High Price'
 	else 'Premium Price'
 end as price_category
 from trainer;
@@ -133,21 +144,20 @@ from trainer;
 Локальная таблица видна только в рамках сессии, где была создана. При завершении сессии таблица удаляется. Если имя локальной таблицы совпадает с именем постоянной, то постоянная затеняется до удаления временной.
 
 > Создать локальную таблицу 
+
 ```sql
 create temporary table BestClients as
 select c.id as client_id, 
        c.name as client_name, 
-       count(ct.id_trainer) as total_sessions, 
+       count(w.id_trainer) as total_sessions, 
        sum(t.price_per_hour) as total_spent
 from client c
-join client_trainer ct on c.id = ct.id_client
-join trainer t on ct.id_trainer = t.id_origin
+join workout w on c.id = w.id_client
+join trainer t on w.id_trainer = t.id_origin
 group by c.id, c.name;
 
 select BestClients.client_name, BestClients.total_sessions from BestClients;
 ```
-
-Получили таблицу с информацией о каждом клиенте
 
 ### 12. Инструкция `SELECT`, использующая вложенные коррелированные подзапросы в качестве производных таблиц в предложении `FROM`
 
@@ -160,7 +170,7 @@ select 'Most Popular Trainer' as "Criteria", c.name as "Trainer Name", top_train
 from client c
 join (
     select id_trainer, count(*) as session_count
-    from client_trainer
+    from workout
     group by id_trainer
     order by session_count desc
     limit 1
@@ -186,11 +196,11 @@ join (
 select c.name as "Top Client"
 from client c
 where id in (select id_client
-            from client_trainer
+            from workout
             group by id_client
             having count(id_trainer) = (select max(session_count)
                                         from (select id_client, count(id_trainer) as session_count
-                                              from client_trainer
+                                              from workout
                                               group by id_client) as session_data)) limit 1;
 ```
  
@@ -198,14 +208,14 @@ where id in (select id_client
 1. Получение количества тренировок для клиентов, которые совершили хотя бы одну тренировку (Рассмотрение прочих не имеет смысла)
 ```sql
 select id_client, count(id_client) as session_count 
-from client_trainer
+from workout
 group by id_client;
 ```
 
 2. Получить наибольшее значение сессий из выборки п.1
 ```sql
 select max(session_count) from (select id_client, count(id_client) as session_count 
-from client_trainer
+from workout
 group by id_client) as session_data;
 ```
 
@@ -214,11 +224,11 @@ group by id_client) as session_data;
 select c.name as "Top Client"
 from client c
 where id in (select id_client
-            from client_trainer
+            from workout
             group by id_client
             having count(id_trainer) = (select max(session_count)
                                         from (select id_client, count(id_trainer) as session_count
-                                              from client_trainer
+                                              from workout
                                               group by id_client) as session_data)) limit 1;
 ```
 
@@ -228,9 +238,9 @@ where id in (select id_client
 ```sql
 select t.id_origin as "TrainerID", 
        t.price_per_hour as "TrainerPrice", 
-       count(ct.id_client) as "ClientCount"
+       count(w.id_client) as "ClientCount"
 from trainer t
-join client_trainer ct on t.id_origin = ct.id_trainer
+join workout w on t.id_origin = w.id_trainer
 group by t.id_origin, t.price_per_hour;
 ```
 
@@ -257,7 +267,7 @@ values ('Moscow');
 > Запланировать тренировку
 
 ```sql
-insert into client_trainer (id_client, id_trainer, id_gym, date)
+insert into workout (id_client, id_trainer, id_gym, date)
 select c.id, t.id_origin, g.id, now() + interval '1 week'
 from client c
 join trainer t on t.id_origin = 'f35258f6-c71a-43c4-9a36-01a99695334c'
@@ -274,7 +284,7 @@ update trainer
 set price_per_hour = price_per_hour * 1.1 
 where id_origin in (
     select id_trainer
-    from client_trainer
+    from workout
     where date >= now() - interval '1 month'
     group by id_trainer
     having count(id) > 30
@@ -340,40 +350,46 @@ select * from trainer_with_numeration;
 ---
 ### 24. Оконные функции
 
-> **Оконная функция** - функция, работающая с набором строк. Набор строк именуется окном или партицией.
+**Оконная функция** - функция, работающая с набором строк. Набор строк именуется окном или партицией.
 
-Синтаксис оконной функции:
-```sql
-SELECT
-Название функции (столбец для вычислений) 
-OVER (
-      PARTITION BY столбец для группировки
-      ORDER BY столбец для сортировки
-      ROWS или RANGE выражение для ограничения строк в пределах группы
-      )
-```
+> В рамках каждого уровня тренеров отранжировать их согласно возрастанию цены (Высший ранг у самого дорогого)
 
-**Пример №24.** Средняя ставка самых дорогих 10-ти тренеров сети.
 ```sql
-select avg(tr.price_per_hour)
-over() 
-from (select price_per_hour from trainer order by price_per_hour desc limit 10) as tr limit 1;
+select
+    id_origin,
+    level,
+    price_per_hour,
+    rank() over (partition by level order by price_per_hour desc) as rank_within_level
+from
+    trainer;
 ```
 
 ### 25. Очистка от дубликтов с помощью `ROW_NUMBER()`
-1. Создадим локальную таблицу с дубликатами
-```sql
-create temporary table trainer_with_duplicates as
-select 
-    t.id_origin, 
-    t.price_per_hour
-from 
-    trainer t
 
-union all  
-select 
-    t.id_origin, 
-    t.price_per_hour
-from 
-    trainer t;
+> Создадим таблицу с дубликатами
+```sql
+create table trainer_with_duplicates as
+select * from trainer;
+
+insert into trainer_with_duplicates (id_origin, price_per_hour, level)
+select id_origin, price_per_hour, level
+from trainer
+limit 5;
+```
+
+> Сгруппируем по `(id_origin, price_per_hour, level)`. `row_number()` разметит каждую группу и у дубликатов значение `row_num > 1` 
+```sql
+with dupMapper as (
+    select id_origin, price_per_hour, level,
+    row_number() over (partition by id_origin, price_per_hour, level order by id_origin) as row_num
+    from trainer_with_duplicates
+)
+```
+
+> Удалим строки в исходной таблице, которым соответствует условие `row_num > 1` в `dupMapper`
+```sql
+delete from trainer_with_deplicates
+where id_origin in (
+    select id_origin from dupMapper where row_num > 1
+);
 ```
