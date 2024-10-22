@@ -1,4 +1,4 @@
-all: gen drop create insert
+all: drop create insert
 
 gen:
 	python3 main.py -gen

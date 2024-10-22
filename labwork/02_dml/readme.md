@@ -318,7 +318,6 @@ select count(*) from EliteTrainers;
 ```
 
 ### 23. Recursive `CTE`
-> Рекурсивно генерируем числа от 1 до len(trainer) и конкатинируем id тренеров с этими номерами.
 ```sql
 create temporary table trainer_with_numeration (
     trainer_id uuid primary key,
@@ -333,6 +332,7 @@ with recursive numeration(num) as (
     from numeration nm
     where nm.num < (select count(*) from trainer)
 )
+	
 insert into trainer_with_numeration (trainer_id, price_per_hour, number)
 select 
     t.id_origin,
@@ -345,7 +345,11 @@ join
 order by 
     n.num;
 
-select * from trainer_with_numeration;
+select 
+    number as id,
+    concat(number, '--', trainer_id) as string
+from 
+    trainer_with_numeration;
 ```
 ---
 ### 24. Оконные функции
